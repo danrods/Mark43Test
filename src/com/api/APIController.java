@@ -108,4 +108,135 @@ public class APIController {
     }
 
 
+    public class FreqNode {
+
+        String key;
+        int freq;
+
+        public FreqNode(String key, int val){this.key = key; freq=val;}
+        public String getKey() {
+            return key;
+        }
+
+        public void setKey(String key) {
+            this.key = key;
+        }
+
+        public int getFreq() {
+            return freq;
+        }
+
+        public void setFreq(int freq) {
+            this.freq = freq;
+        }
+
+        public String toString(){
+            return "Key :" + key + "\tFreq:" + freq;
+        }
+    }
+
+    public class MinComparator implements Comparator<FreqNode> {
+
+        @Override
+        public int compare(FreqNode left, FreqNode right) {
+            // 2 - 3
+            return left.getFreq() - right.getFreq();
+        }
+    }
+
+    public class MaxComparator implements Comparator<FreqNode> {
+
+        @Override
+        public int compare(FreqNode left, FreqNode right) {
+            // 2 - 3
+            return right.getFreq() - left.getFreq();
+        }
+    }
+
+    @RequestMapping(value=MED_FREQ, method= {RequestMethod.GET, RequestMethod.POST}, consumes = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> medianFreq(@RequestBody String json, HttpServletRequest req){
+
+        Map<String, FreqNode> dictionary = new HashMap<>();
+
+        try {
+            String text = parseJSON(json);
+            String[] words = text.split(" ");
+            PriorityQueue<FreqNode> minheap = new PriorityQueue<>(words.length, new MinComparator());
+            PriorityQueue<FreqNode> maxheap = new PriorityQueue<>(words.length, new MaxComparator());
+
+            FreqNode val;
+            for(String word : words){
+                if((val = dictionary.get(word)) == null){
+                    val = new FreqNode(word, 1);
+                    minheap.add(val);
+                    maxheap.add(val);
+                }
+                dictionary.put(word, val);
+            }
+
+
+            return new ResponseEntity<String>("" , HttpStatus.OK);
+        }
+        catch (JSONException e) {
+            return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+    @RequestMapping(value=AVG_SENTENCE_LEN, method= {RequestMethod.GET, RequestMethod.POST}, consumes = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> avgSentence(@RequestBody String json, HttpServletRequest req){
+
+        try {
+            String text = parseJSON(json);
+            String[] sentences = text.split("(\\.|!|\\?)");
+
+            int average = 0, totalSentences = 0, totalLength = 0;
+            for(String sentence : sentences){
+                if(sentence.matches("[a-zA-z\\s,\\-\'\"()@;:]+\\s*")){ //If Matches a sentence
+                    totalSentences++;
+
+                    //Trim the sentence to get rid of any leading/trailing white space before we get the length
+                    //We need to add 1 for ?,! or . that we removed when splitting
+                    totalLength += sentence.trim().length() + 1;
+                }
+                else System.out.println("Invalid Sentence!");
+
+            }
+
+            if(totalSentences > 0) average = totalLength / totalSentences;
+
+            return new ResponseEntity<String>("" + average, HttpStatus.OK);
+        }
+        catch (JSONException e) {
+            return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @RequestMapping(value=PHONE_NUM, method= {RequestMethod.GET, RequestMethod.POST}, consumes = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> phoneNumbers(@RequestBody String json, HttpServletRequest req){
+
+        try {
+            String text = parseJSON(json);
+            String[] words = text.split(" ");
+
+
+            List<String> numberList = new LinkedList<>();
+            for(String word : words){
+                if(word.matches("(\\([0-9]{3}\\)\\-?|[0-9]{3}\\-?)?[0-9]{3}\\-?[0-9]{4}")){ //If Matches a Phone number
+                    numberList.add(word);
+                }
+                else System.out.println(word + " is not a valid phone number");
+
+            }
+
+            return new ResponseEntity<String>(numberList+"" , HttpStatus.OK);
+        }
+        catch (JSONException e) {
+            return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
+    }
+
 }
