@@ -57,14 +57,14 @@ Danny Rodrigues - String API
     Code is not included. Also the numbers allowed can have dashes separating
     the area code and phone number, the area code can have parens, I've
     tested successfully the following combinations : 
-    1. (631)-295-6681 
-    2. (631)-2956681 
-    3. (631)2956681 
-    4. 631-295-6681
-    5. 631-2956681
-    6. 6312956681
-    7. 295-6681
-    8. 2956681   
+    1. (631)-294-6681 
+    2. (631)-2946681 
+    3. (631)2946681 
+    4. 631-294-6681
+    5. 631-2946681
+    6. 6312946681
+    7. 294-6681
+    8. 2946681   
     
     The Regex I used for the phone numbers is the following :
     `(\([0-9]{3}\)\-?|[0-9]{3}\-?)?[0-9]{3}\-?[0-9]{4}`
