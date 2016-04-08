@@ -12,11 +12,9 @@ Danny Rodrigues - String API
     dashes, quotes or ticks subsequently followed by more optional letters to allow
     for Portmanteau words such as 'Happy-Go-Lucky.' Additionally a word
     can end with an ending such as ?,! or . If any numbers are included
-    the word will fail to match the regex. There are probably some pitfalls
-    in the regex, such as allowing for multiple ticks, quotes or dashes
-    such as Happy--------go-Lucky''''''''''s, which can be fixed but
-    I chose to, according to the instructions to "not follow the rabbithole."
-    With more time and a few tweaks this could be perfect.
+    the word will fail to match the regex. With more time and a few tweaks
+     this could be perfect, just didn't want to fully follow the rabbit hole,
+     to be as efficient as possible.
     
 2. Function 2 : **Most common word**
     Function 2, the most common word is easily found by first using a map
