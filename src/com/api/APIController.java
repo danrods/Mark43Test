@@ -36,7 +36,7 @@ public class APIController {
     //A sentence which contains letters, dashes, quotes, ticks, Parens, semicolons, colons, etc.
     private static final String SENTENCE_REGEX = "[a-zA-z\\s,\\-\'\"()@;:]+\\s*";
 
-
+    //Match a phone number with optional Area code
     private static final String PHONE_REGEX = "(\\([0-9]{3}\\)\\-?|[0-9]{3}\\-?)?[0-9]{3}\\-?[0-9]{4}";
     /**
      * Convenience Method that will parse a string containing JSON into a JSON Object
@@ -173,50 +173,45 @@ public class APIController {
     }
 
 
+    /**
+     * Inner class to make it easy to parse the median after the fact.
+     */
     public class FreqNode {
 
         String key;
         int freq;
 
         public FreqNode(String key, int val){this.key = key; freq=val;}
-        public String getKey() {
-            return key;
+
+        public void incFrequency(){
+            freq++;
         }
 
-        public void setKey(String key) {
-            this.key = key;
-        }
-
-        public int getFreq() {
-            return freq;
-        }
-
-        public void setFreq(int freq) {
-            this.freq = freq;
+        public void decFrequency(){
+            freq--;
         }
 
         public String toString(){
-            return "Key :" + key + "\tFreq:" + freq;
+            return "Key: " + key + " Freq: " + freq;
         }
     }
 
+    /**
+     * Comparator for a FreqNode that first compares the frequency, \
+     * then lexicographically by the key.
+     */
     public class MinComparator implements Comparator<FreqNode> {
 
         @Override
         public int compare(FreqNode left, FreqNode right) {
             // 2 - 3
-            return left.getFreq() - right.getFreq();
+            int num;
+            if((num = left.freq - right.freq) != 0) return num; //If not equal just return the int
+
+            return left.key.compareTo(right.key); //else use String compare method to compare lexicographically
         }
     }
 
-    public class MaxComparator implements Comparator<FreqNode> {
-
-        @Override
-        public int compare(FreqNode left, FreqNode right) {
-            // 2 - 3
-            return right.getFreq() - left.getFreq();
-        }
-    }
 
     /**
      * Method to Find the word(s) with Median Frequency in a list of text.
@@ -229,24 +224,37 @@ public class APIController {
     public ResponseEntity<String> medianFreq(@RequestBody String json, HttpServletRequest req){
 
         Map<String, FreqNode> dictionary = new HashMap<>();
+        ArrayList<FreqNode> nodeList = new ArrayList<>();
 
         try {
             String text = parseJSON(json);
             String[] words = text.split(" ");
-            PriorityQueue<FreqNode> minheap = new PriorityQueue<>(words.length, new MinComparator());
-            PriorityQueue<FreqNode> maxheap = new PriorityQueue<>(words.length, new MaxComparator());
 
             FreqNode val;
             for(String word : words){
                 if((val = dictionary.get(word)) == null){
-                    val = new FreqNode(word, 1);
-                    minheap.add(val);
-                    maxheap.add(val);
+                    val = new FreqNode(word, 0);
+                    nodeList.add(val);
                 }
+                val.incFrequency();
                 dictionary.put(word, val);
             }
 
-            return new ResponseEntity<String>("" , HttpStatus.OK);
+            Collections.sort(nodeList, new MinComparator()); //Sort the list ascending using our comparator
+            System.out.println(nodeList);
+
+
+            // [ 1, 2, 3] mid = 3/2 = 1  or [1, 2, 3, 4] mid = 4/2 = 2
+            List<String> returnList = new ArrayList<>(2);
+
+            int mid = nodeList.size()/2;
+            returnList.add(nodeList.get(mid).key); //Add the median of the list (Integer division takes floor)
+
+            if((nodeList.size() & 1) == 0){ //If we have an even number of elements, add mid - 1 as well
+                returnList.add(nodeList.get(mid - 1).key);
+            }
+
+            return new ResponseEntity<String>("" + returnList, HttpStatus.OK);
         }
         catch (JSONException e) {
             return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
