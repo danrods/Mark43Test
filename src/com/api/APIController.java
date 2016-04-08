@@ -1,16 +1,16 @@
 package com.api;
 
-import com.fasterxml.jackson.databind.util.JSONPObject;
 import com.google.appengine.labs.repackaged.org.json.JSONException;
 import com.google.appengine.labs.repackaged.org.json.JSONObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
 import java.util.*;
 
 /**
@@ -26,8 +26,28 @@ public class APIController {
     private static final String AVG_SENTENCE_LEN = "/sentences/avg_len";
     private static final String PHONE_NUM = "/phones";
 
+
+    private static final String SPACE_DELIM = " "; //Find space separated words
+    private static final String SENTENCE_DELIM = "(\\.|!|\\?)"; //Match a Period, Question Mark or Exclamation Point
+
+    //A period, or Exclamation point, or word composed of at least one letter with possible - or ' or "
+    private static final String WORD_REGEX = "\\.|!$|[a-zA-z]+(-|\'|\")*[a-zA-z]*(!|\\.)*";
+
+    //A sentence which contains letters, dashes, quotes, ticks, Parens, semicolons, colons, etc.
+    private static final String SENTENCE_REGEX = "[a-zA-z\\s,\\-\'\"()@;:]+\\s*";
+
+
+    private static final String PHONE_REGEX = "(\\([0-9]{3}\\)\\-?|[0-9]{3}\\-?)?[0-9]{3}\\-?[0-9]{4}";
+    /**
+     * Convenience Method that will parse a string containing JSON into a JSON Object
+     *  and then fetch the 'text' that was passed in if the JSON was well-formed and according to
+     *  the input specification
+     * @param json The JSON Object as a String
+     * @return Returns the text we will be parsing if it is of the form --> {"text":"Hello World!"}
+     * @throws JSONException Throws exception if the String json was not well formed
+     */
     private String parseJSON(String json) throws JSONException{
-        JSONObject object = new JSONObject(json);
+        JSONObject object = new JSONObject(json); //Lets let Java do the parsing for us
         String text = object.getString("text");
         System.out.println("TEXT : " + text);
 
@@ -35,42 +55,82 @@ public class APIController {
         return text;
     }
 
-    @RequestMapping(value=AVG_WORD_LEN, method= {RequestMethod.GET, RequestMethod.POST}, consumes = "application/json")
+
+    /**
+     * Convenience Method to parse text into tokens based on the given Regex.
+     * @param text The text we are delimiting
+     * @param splitRegex The Regex we are using to split up into tokens.
+     * @param matchRegex The Regex we are using to verify token is valid.
+     * @return A list of tokens that match the matchRegex
+     */
+    private List<String> matchTokens(String text, String splitRegex, String matchRegex){
+
+        List<String> tokenList = new LinkedList<>();
+
+        if(text == null && splitRegex == null && matchRegex == null){
+            System.out.println("Text, SplitRegex and MatchRegex must be provided");
+            return tokenList;
+        }
+
+        String[] tokens = text.split(splitRegex);
+
+        for(String token : tokens){
+
+            if(token.matches(matchRegex)){
+                tokenList.add(token);
+            }
+            else System.out.println("Invalid Token : "+ token);
+        }
+
+        return tokenList;
+    }
+
+
+    /**
+     * Method to Find the average length of a single word in a list of text.
+     * @param json The JSON element that was passed to the HTTP Post Request.
+     * @param req The Request object, unused.
+     * @return Returns a ResponseEntity with the average word length (0 if none matched) or an error message if failed.
+     */
+    @RequestMapping(value=AVG_WORD_LEN, method=RequestMethod.POST, consumes = "application/json")
     @ResponseBody
     public ResponseEntity<String> averageWord(@RequestBody String json, HttpServletRequest req){
 
         try{
             String text = parseJSON(json);
-            String[] words = text.split(" ");
 
-            int average = 0, totalWords = 0, totalLength = 0;
-            for(String word : words){
-                //A period, or Exclamation point, or word composed of at least one letter with possible - or ' or "
-                if(word.matches("\\.|!$|[a-zA-z]+(-|\'|\")*[a-zA-z]*(!|\\.)*")){
-                    totalWords++;
-                    totalLength += word.length();
-                }
-                else System.out.println("Invalid word : "+ word);
+            List<String> tokens = matchTokens(text, SPACE_DELIM, WORD_REGEX);
+
+            int average = 0, totalLength = 0;
+            for(String s : tokens){
+                totalLength += s.length();
             }
 
-            if(totalWords > 0) average = totalLength / totalWords;
+            if(tokens.size() > 0) average = totalLength / tokens.size(); //Let's not divide by zero
 
             return new ResponseEntity<String>("" + average, HttpStatus.OK);
         }
         catch (JSONException e) {
             return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
         }
-
+        catch(Exception e){
+            return new ResponseEntity<String>("Unexpected Error : " + e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
 
     }
 
 
-
-    @RequestMapping(value=COMMON_WORDS, method= {RequestMethod.GET, RequestMethod.POST}, consumes = "application/json")
+    /**
+     * Method to Find the common words in a list of text.
+     * @param json The JSON element that was passed to the HTTP Post Request.
+     * @param req The Request object, unused.
+     * @return Returns a ResponseEntity with the most common word (null if none) upon request or error message if failed.
+     */
+    @RequestMapping(value=COMMON_WORDS, method=RequestMethod.POST, consumes = "application/json")
     @ResponseBody
     public ResponseEntity<String> commonWord(@RequestBody String json, HttpServletRequest req){
 
-        Map<String, Integer> dictionary = new HashMap<>();
+        Map<String, Integer> dictionary = new HashMap<>(); //Used to store word frequency
 
         try {
             String text = parseJSON(json);
@@ -78,32 +138,37 @@ public class APIController {
 
             Integer val;
             for(String word : words){
-                if((val = dictionary.get(word)) == null){
-                    val = 0;
+                if((val = dictionary.get(word)) == null){ //If we haven't found this word yet
+                    val = 0; //Java will auto-cast to Integer object
                 }
                 dictionary.put(word, ++val);
             }
 
             int occurrences = 0;
             Integer value;
-            LinkedList<String> returnList = new LinkedList<>();
+
+            LinkedList<String> returnList = new LinkedList<>(); //The list of words with highest frequency
             for(String key : dictionary.keySet()){
-                if((value = dictionary.get(key))!= null && value > occurrences){ //Just in case a key is mapped to null
-                    returnList.clear();
-                    returnList.add(key);
-                    occurrences = value;
+                if((value = dictionary.get(key))!= null  //Just in case a key is mapped to null. Should never happen
+                        && value > occurrences){ //If the current max frequency is less than the one we just found
+                    returnList.clear(); //Clear the previous max frequency list
+                    returnList.add(key); //Add the new one
+                    occurrences = value; //Set the new max frequency
                 }
                 else if(value == occurrences){ //In case multiple matches
                     returnList.add(key);
                 }
             }
 
-            Collections.sort(returnList);
+            Collections.sort(returnList); //Sort the List Lexicographically
 
-            return new ResponseEntity<String>(returnList.poll(), HttpStatus.OK);
+            return new ResponseEntity<String>(returnList.poll(), HttpStatus.OK); //Return the head of the list
         }
         catch (JSONException e) {
             return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
+        catch(Exception e){
+            return new ResponseEntity<String>("Unexpected Error : " + e.getMessage(),HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -153,7 +218,13 @@ public class APIController {
         }
     }
 
-    @RequestMapping(value=MED_FREQ, method= {RequestMethod.GET, RequestMethod.POST}, consumes = "application/json")
+    /**
+     * Method to Find the word(s) with Median Frequency in a list of text.
+     * @param json The JSON element that was passed to the HTTP Post Request.
+     * @param req The Request object, unused.
+     * @return Returns a ResponseEntity with the median words upon request (null if none) or error message if failed.
+     */
+    @RequestMapping(value=MED_FREQ, method=RequestMethod.POST, consumes = "application/json")
     @ResponseBody
     public ResponseEntity<String> medianFreq(@RequestBody String json, HttpServletRequest req){
 
@@ -175,67 +246,73 @@ public class APIController {
                 dictionary.put(word, val);
             }
 
-
             return new ResponseEntity<String>("" , HttpStatus.OK);
         }
         catch (JSONException e) {
             return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
         }
+        catch(Exception e){
+            return new ResponseEntity<String>("Unexpected Error : " + e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
     }
 
 
-    @RequestMapping(value=AVG_SENTENCE_LEN, method= {RequestMethod.GET, RequestMethod.POST}, consumes = "application/json")
+    /**
+     * Method to Find the average sentence length in a list of text.
+     * @param json The JSON element that was passed to the HTTP Post Request.
+     * @param req The Request object, unused.
+     * @return Returns a ResponseEntity with the average sentence length (0 if no sentences) upon request or error message if failed.
+     */
+    @RequestMapping(value=AVG_SENTENCE_LEN, method=RequestMethod.POST, consumes = "application/json")
     @ResponseBody
     public ResponseEntity<String> avgSentence(@RequestBody String json, HttpServletRequest req){
 
         try {
             String text = parseJSON(json);
-            String[] sentences = text.split("(\\.|!|\\?)");
 
-            int average = 0, totalSentences = 0, totalLength = 0;
-            for(String sentence : sentences){
-                if(sentence.matches("[a-zA-z\\s,\\-\'\"()@;:]+\\s*")){ //If Matches a sentence
-                    totalSentences++;
+            List<String> tokens = matchTokens(text, SENTENCE_DELIM, SENTENCE_REGEX);
 
-                    //Trim the sentence to get rid of any leading/trailing white space before we get the length
-                    //We need to add 1 for ?,! or . that we removed when splitting
-                    totalLength += sentence.trim().length() + 1;
-                }
-                else System.out.println("Invalid Sentence!");
-
+            int average = 0, totalLength = 0;
+            for(String s : tokens){
+                //Trim the sentence to get rid of any leading/trailing white space before we get the length
+                //We need to add 1 for ?,! or . that we removed when splitting
+                totalLength += s.trim().length() + 1;
             }
 
-            if(totalSentences > 0) average = totalLength / totalSentences;
+            if(tokens.size() > 0) average = totalLength / tokens.size(); //Let's not divide by zero
 
             return new ResponseEntity<String>("" + average, HttpStatus.OK);
         }
         catch (JSONException e) {
             return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
         }
+        catch(Exception e){
+            return new ResponseEntity<String>("Unexpected Error : " + e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
     }
 
-    @RequestMapping(value=PHONE_NUM, method= {RequestMethod.GET, RequestMethod.POST}, consumes = "application/json")
+    /**
+     * Method to Find the phone numbers in a list of text.
+     * @param json The JSON element that was passed to the HTTP Post Request.
+     * @param req The Request object, unused.
+     * @return Returns a ResponseEntity with a list of valid phone numbers upon request (empty list if none) or error message if failed.
+     */
+    @RequestMapping(value=PHONE_NUM, method=RequestMethod.POST, consumes = "application/json")
     @ResponseBody
     public ResponseEntity<String> phoneNumbers(@RequestBody String json, HttpServletRequest req){
 
         try {
             String text = parseJSON(json);
-            String[] words = text.split(" ");
 
+            List<String> tokens = matchTokens(text, SPACE_DELIM, PHONE_REGEX);
 
-            List<String> numberList = new LinkedList<>();
-            for(String word : words){
-                if(word.matches("(\\([0-9]{3}\\)\\-?|[0-9]{3}\\-?)?[0-9]{3}\\-?[0-9]{4}")){ //If Matches a Phone number
-                    numberList.add(word);
-                }
-                else System.out.println(word + " is not a valid phone number");
-
-            }
-
-            return new ResponseEntity<String>(numberList+"" , HttpStatus.OK);
+            return new ResponseEntity<String>(tokens+"" , HttpStatus.OK);
         }
         catch (JSONException e) {
             return new ResponseEntity<String>("Error, Malformed JSON : " + e.getMessage(),HttpStatus.BAD_REQUEST);
+        }
+        catch(Exception e){
+            return new ResponseEntity<String>("Unexpected Error : " + e.getMessage(),HttpStatus.BAD_REQUEST);
         }
     }
 
