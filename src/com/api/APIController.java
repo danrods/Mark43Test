@@ -31,10 +31,10 @@ public class APIController {
     private static final String SENTENCE_DELIM = "(\\.|!|\\?)"; //Match a Period, Question Mark or Exclamation Point
 
     //A period, or Exclamation point, or word composed of at least one letter with possible - or ' or "
-    private static final String WORD_REGEX = "\\.|!$|[a-zA-z]+(-|\'|\")*[a-zA-z]*(!|\\.)*";
+    private static final String WORD_REGEX = "\\.|!$|\\?$|[a-zA-z]+((-|'|\")?\\s*[a-zA-z]+)*(\\?|!|\\.)?";
 
     //A sentence which contains letters, dashes, quotes, ticks, Parens, semicolons, colons, etc.
-    private static final String SENTENCE_REGEX = "[a-zA-z\\s,\\-\'\"()@;:]+\\s*";
+    private static final String SENTENCE_REGEX = "[a-zA-z]+((-|'|\")?\\s*[a-zA-z]+ |\\s*(|;|:|,)\\s*[a-zA-z]+)*";
 
     //Match a phone number with optional Area code
     private static final String PHONE_REGEX = "(\\([0-9]{3}\\)\\-?|[0-9]{3}\\-?)?[0-9]{3}\\-?[0-9]{4}";
@@ -76,7 +76,7 @@ public class APIController {
 
         for(String token : tokens){
 
-            if(token.matches(matchRegex)){
+            if(token.trim().matches(matchRegex)){
                 tokenList.add(token);
             }
             else System.out.println("Invalid Token : "+ token);
@@ -247,12 +247,16 @@ public class APIController {
             // [ 1, 2, 3] mid = 3/2 = 1  or [1, 2, 3, 4] mid = 4/2 = 2
             List<String> returnList = new ArrayList<>(2);
 
-            int mid = nodeList.size()/2;
-            returnList.add(nodeList.get(mid).key); //Add the median of the list (Integer division takes floor)
+            if(! nodeList.isEmpty()){ //Obviously only get median if we have anything to get the median of
 
-            if((nodeList.size() & 1) == 0){ //If we have an even number of elements, add mid - 1 as well
-                returnList.add(nodeList.get(mid - 1).key);
+                int mid = nodeList.size()/2;
+                returnList.add(nodeList.get(mid).key); //Add the median of the list (Integer division takes floor)
+
+                if((nodeList.size() & 1) == 0){ //If we have an even number of elements, add mid - 1 as well
+                    returnList.add(nodeList.get(mid - 1).key);
+                }
             }
+
 
             return new ResponseEntity<String>("" + returnList, HttpStatus.OK);
         }
